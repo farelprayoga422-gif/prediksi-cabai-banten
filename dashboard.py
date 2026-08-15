@@ -2,622 +2,1361 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import warnings
-warnings.filterwarnings('ignore')
 
-from statsmodels.tsa.stattools import adfuller
-from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+warnings.filterwarnings("ignore")
+
 from statsmodels.tsa.arima.model import ARIMA
-from pmdarima import auto_arima
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
-# ─────────────────────────────────────────────
+
+# ============================================================
 # KONFIGURASI HALAMAN
-# ─────────────────────────────────────────────
+# ============================================================
+
 st.set_page_config(
     page_title="Prediksi Harga Cabai Merah Keriting Banten",
     page_icon="🌶️",
     layout="wide"
 )
 
-# ─────────────────────────────────────────────
-# CSS KUSTOM
-# ─────────────────────────────────────────────
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
+# ============================================================
+# CSS
+# ============================================================
+
+st.markdown(
+    """
+    <style>
 
     .main-title {
-        font-size: 2rem;
+        font-size: 32px;
         font-weight: 700;
         color: #1a1a2e;
-        margin-bottom: 0.2rem;
+        margin-bottom: 4px;
     }
 
     .sub-title {
-        font-size: 1rem;
+        font-size: 16px;
         color: #6b7280;
-        margin-bottom: 2rem;
+        margin-bottom: 20px;
     }
 
-    .metric-card {
-        background: #ffffff;
-        border-radius: 12px;
-        padding: 1.2rem 1.5rem;
-        border: 1px solid #e5e7eb;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    }
-
-    .metric-label {
-        font-size: 0.78rem;
-        font-weight: 600;
-        color: #6b7280;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-bottom: 0.3rem;
-    }
-
-    .metric-value {
-        font-size: 1.6rem;
+    .section-title {
+        font-size: 21px;
         font-weight: 700;
         color: #1a1a2e;
+        margin-top: 28px;
+        margin-bottom: 12px;
     }
 
-    .metric-value.red   { color: #e84855; }
-    .metric-value.blue  { color: #2e86ab; }
-    .metric-value.green { color: #16a34a; }
-
-    .section-header {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #1a1a2e;
-        border-left: 4px solid #e84855;
-        padding-left: 0.75rem;
-        margin: 1.5rem 0 1rem 0;
-    }
-
-    .badge {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: 999px;
-        font-size: 0.78rem;
-        font-weight: 600;
-    }
-
-    .badge-green  { background: #dcfce7; color: #16a34a; }
-    .badge-yellow { background: #fef9c3; color: #ca8a04; }
-    .badge-red    { background: #fee2e2; color: #dc2626; }
-
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px;
-        padding: 0.5rem 1.2rem;
-        font-weight: 500;
-    }
-
-    hr.divider {
-        border: none;
-        border-top: 1px solid #e5e7eb;
-        margin: 1.5rem 0;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-
-# ─────────────────────────────────────────────
-# FUNGSI UTILITAS
-# ─────────────────────────────────────────────
-def interpretasi_mape(mape):
-    if mape < 10:
-        return "Sangat Baik", "badge-green"
-    elif mape < 20:
-        return "Baik", "badge-green"
-    elif mape < 50:
-        return "Cukup", "badge-yellow"
-    else:
-        return "Kurang Baik", "badge-red"
-
-
-def warna_mape(mape):
-    if mape < 10:
-        return "green"
-    elif mape < 20:
-        return "green"
-    elif mape < 50:
-        return "red"
-    else:
-        return "red"
-
-
-# ─────────────────────────────────────────────
-# HEADER
-# ─────────────────────────────────────────────
-st.markdown('<div class="main-title">🌶️ Prediksi Harga Cabai Merah Keriting</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Provinsi Banten • Algoritma ARIMA • Data PIHPS Nasional (hargapangan.id)</div>', unsafe_allow_html=True)
-st.markdown('<hr class="divider">', unsafe_allow_html=True)
-
-
-# ─────────────────────────────────────────────
-# UPLOAD FILE
-# ─────────────────────────────────────────────
-st.markdown('<div class="section-header">📂 Upload Dataset</div>', unsafe_allow_html=True)
-
-uploaded_file = st.file_uploader(
-    "Upload file Excel dataset harga dari PIHPS Nasional (.xlsx)",
-    type=["xlsx"],
-    help="File Excel berformat Tabel Harga Berdasarkan Komoditas dari hargapangan.id"
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
-if uploaded_file is None:
-    st.info("Silakan upload file Excel dataset terlebih dahulu untuk memulai analisis.")
-    st.stop()
+
+# ============================================================
+# NAMA BULAN
+# ============================================================
+
+nama_bulan = {
+    1: "Januari",
+    2: "Februari",
+    3: "Maret",
+    4: "April",
+    5: "Mei",
+    6: "Juni",
+    7: "Juli",
+    8: "Agustus",
+    9: "September",
+    10: "Oktober",
+    11: "November",
+    12: "Desember"
+}
 
 
-# ─────────────────────────────────────────────
-# BACA & PROSES DATA
-# ─────────────────────────────────────────────
-@st.cache_data
-def load_and_process(file):
-    df_raw   = pd.read_excel(file, header=0)
-    banten_row = df_raw[df_raw['Komoditas (Rp)'] == 'Banten'].iloc[0]
-    date_cols  = [c for c in df_raw.columns if '/' in str(c)]
+# ============================================================
+# FUNGSI FORMAT RUPIAH
+# ============================================================
 
-    df_harian = pd.DataFrame({
-        'tanggal': pd.to_datetime(date_cols, format='%d/ %m/ %Y'),
-        'harga'  : banten_row[date_cols].values
-    })
+def format_rupiah(nilai):
 
-    df_harian['harga'] = df_harian['harga'].replace('-', np.nan)
-    df_harian['harga'] = df_harian['harga'].astype(str).str.replace(',', '').str.strip()
-    df_harian['harga'] = pd.to_numeric(df_harian['harga'], errors='coerce')
-
-    df_bulanan = df_harian.set_index('tanggal').resample('MS').mean()
-    df_bulanan['harga'] = df_bulanan['harga'].interpolate(method='linear')
-
-    return df_bulanan
-
-with st.spinner("Memproses data..."):
-    df_bulanan = load_and_process(uploaded_file)
-
-st.success(f"✅ Data berhasil dimuat: **{len(df_bulanan)} observasi bulanan** "
-           f"({df_bulanan.index[0].strftime('%b %Y')} – {df_bulanan.index[-1].strftime('%b %Y')})")
+    return (
+        "Rp {:,.0f}".format(float(nilai))
+        .replace(",", ".")
+    )
 
 
-# ─────────────────────────────────────────────
-# TABS NAVIGASI
-# ─────────────────────────────────────────────
-tab1, tab2, tab3, tab4 = st.tabs([
-    "📊 Data Historis",
-    "🔬 Pemodelan ARIMA",
-    "📈 Evaluasi Model",
-    "🔮 Prediksi 2026"
-])
+def nama_bulan_indonesia(tanggal):
+
+    return nama_bulan[tanggal.month]
 
 
-# ══════════════════════════════════════════════
-# TAB 1 — DATA HISTORIS
-# ══════════════════════════════════════════════
-with tab1:
-    st.markdown('<div class="section-header">Statistik Deskriptif</div>', unsafe_allow_html=True)
+# ============================================================
+# DATA HISTORIS
+# JANUARI 2021 - DESEMBER 2025
+# ============================================================
 
-    stats = df_bulanan['harga'].describe()
-
-    c1, c2, c3, c4, c5 = st.columns(5)
-    cards = [
-        (c1, "Rata-rata",       f"Rp {stats['mean']:,.0f}",  "blue"),
-        (c2, "Std Deviasi",     f"Rp {stats['std']:,.0f}",   ""),
-        (c3, "Minimum",         f"Rp {stats['min']:,.0f}",   "green"),
-        (c4, "Maksimum",        f"Rp {stats['max']:,.0f}",   "red"),
-        (c5, "Median",          f"Rp {stats['50%']:,.0f}",   "blue"),
-    ]
-    for col, label, value, color in cards:
-        with col:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">{label}</div>
-                <div class="metric-value {color}">{value}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown('<div class="section-header">Grafik Harga Historis</div>', unsafe_allow_html=True)
-
-    fig, ax = plt.subplots(figsize=(13, 5))
-    ax.plot(df_bulanan.index, df_bulanan['harga'],
-            color='#2E86AB', linewidth=2, marker='o', markersize=4)
-    ax.fill_between(df_bulanan.index, df_bulanan['harga'],
-                    alpha=0.12, color='#2E86AB')
-    ax.set_title('Harga Eceran Cabai Merah Keriting di Provinsi Banten\nJanuari 2021 – Desember 2025',
-                 fontsize=13, fontweight='bold')
-    ax.set_xlabel('Bulan')
-    ax.set_ylabel('Harga (Rp/kg)')
-    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'Rp {x:,.0f}'))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b\n%Y'))
-    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-    ax.grid(True, alpha=0.3)
-    plt.tight_layout()
-    st.pyplot(fig)
-    plt.close()
-
-    st.markdown('<div class="section-header">Tabel Data Bulanan</div>', unsafe_allow_html=True)
-    df_tampil = df_bulanan.copy()
-    df_tampil.index = df_tampil.index.strftime('%B %Y')
-    df_tampil.columns = ['Harga (Rp/kg)']
-    df_tampil['Harga (Rp/kg)'] = df_tampil['Harga (Rp/kg)'].apply(lambda x: f"Rp {x:,.0f}")
-    st.dataframe(df_tampil, use_container_width=True)
+periode = pd.date_range(
+    start="2021-01-01",
+    periods=60,
+    freq="MS"
+)
 
 
-# ══════════════════════════════════════════════
-# TAB 2 — PEMODELAN ARIMA
-# ══════════════════════════════════════════════
-with tab2:
+harga = [
 
-    split_idx = int(len(df_bulanan) * 0.8)
-    train = df_bulanan.iloc[:split_idx]
-    test  = df_bulanan.iloc[split_idx:]
+    51555.0,
+    59057.89,
+    54881.82,
+    46061.9,
+    35382.35,
+    27095.24,
+    30054.76,
+    23490.0,
+    23506.82,
+    34692.5,
+    47568.18,
+    45293.48,
 
-    st.markdown('<div class="section-header">Pembagian Data Training & Testing</div>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Data Training (80%)</div>
-            <div class="metric-value blue">{len(train)} bulan</div>
-            <div style="color:#6b7280;font-size:0.85rem;margin-top:0.3rem">
-                {train.index[0].strftime('%b %Y')} – {train.index[-1].strftime('%b %Y')}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Data Testing (20%)</div>
-            <div class="metric-value red">{len(test)} bulan</div>
-            <div style="color:#6b7280;font-size:0.85rem;margin-top:0.3rem">
-                {test.index[0].strftime('%b %Y')} – {test.index[-1].strftime('%b %Y')}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    33378.57,
+    38447.22,
+    48431.82,
+    41394.74,
+    44426.67,
+    82885.71,
+    95711.9,
+    68111.36,
+    69936.36,
+    52440.48,
+    35993.18,
+    38131.82,
 
-    st.markdown('<div class="section-header">Uji Stasionaritas (Augmented Dickey-Fuller)</div>', unsafe_allow_html=True)
+    45504.55,
+    48780.0,
+    41473.91,
+    39552.5,
+    32031.82,
+    33104.55,
+    35090.48,
+    42217.39,
+    38178.57,
+    47190.91,
+    81620.45,
+    80007.89,
 
-    result_asli = adfuller(train['harga'].dropna())
-    p_asli      = result_asli[1]
+    70978.26,
+    79464.29,
+    60657.14,
+    43093.18,
+    50360.87,
+    51740.0,
+    43708.7,
+    41538.64,
+    30750.0,
+    27963.04,
+    27857.14,
+    47045.45,
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">ADF Statistic (Data Asli)</div>
-            <div class="metric-value">{result_asli[0]:.4f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">p-value (Data Asli)</div>
-            <div class="metric-value {'red' if p_asli > 0.05 else 'green'}">{p_asli:.4f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col3:
-        status = "❌ Tidak Stasioner → perlu differencing" if p_asli > 0.05 else "✅ Stasioner"
-        warna  = "red" if p_asli > 0.05 else "green"
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Kesimpulan</div>
-            <div class="metric-value {warna}" style="font-size:1rem">{status}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    65150.0,
+    52517.5,
+    54923.81,
+    61797.73,
+    40809.09,
+    42547.62,
+    41469.57,
+    38852.38,
+    57172.73,
+    60336.96,
+    64962.5,
+    57947.62
 
-    if p_asli > 0.05:
-        result_diff = adfuller(train['harga'].diff().dropna())
-        p_diff      = result_diff[1]
-        st.markdown("**Hasil Differencing Orde 1:**")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">ADF Statistic (Diff 1)</div>
-                <div class="metric-value">{result_diff[0]:.4f}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">p-value (Diff 1)</div>
-                <div class="metric-value {'red' if p_diff > 0.05 else 'green'}">{p_diff:.4f}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with col3:
-            status2 = "✅ Stasioner setelah Differencing" if p_diff <= 0.05 else "❌ Masih tidak stasioner"
-            warna2  = "green" if p_diff <= 0.05 else "red"
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Kesimpulan</div>
-                <div class="metric-value {warna2}" style="font-size:1rem">{status2}</div>
-            </div>
-            """, unsafe_allow_html=True)
+]
 
-    st.markdown('<div class="section-header">Plot ACF & PACF</div>', unsafe_allow_html=True)
 
-    data_plot = train['harga'].diff().dropna() if p_asli > 0.05 else train['harga']
-    label_acf = "(Setelah Differencing)" if p_asli > 0.05 else "(Data Asli)"
+df = pd.DataFrame(
+    {
+        "harga": harga
+    },
+    index=periode
+)
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 4))
-    plot_acf(data_plot,  lags=20, ax=axes[0], alpha=0.05)
-    plot_pacf(data_plot, lags=20, ax=axes[1], alpha=0.05)
-    axes[0].set_title(f'ACF {label_acf}',  fontweight='bold')
-    axes[1].set_title(f'PACF {label_acf}', fontweight='bold')
-    plt.tight_layout()
-    st.pyplot(fig)
-    plt.close()
 
-    st.markdown('<div class="section-header">Pemilihan Model ARIMA Terbaik (Auto ARIMA)</div>', unsafe_allow_html=True)
+# ============================================================
+# PEMBAGIAN DATA
+#
+# 80% TRAINING
+# 20% TESTING
+#
+# Training : Januari 2021 - Desember 2024
+# Testing  : Januari 2025 - Desember 2025
+# ============================================================
 
-    with st.spinner("🔍 Mencari model ARIMA terbaik berdasarkan AIC..."):
-        model_auto = auto_arima(
-            train['harga'],
-            seasonal=False,
-            information_criterion='aic',
-            stepwise=True,
-            error_action='ignore',
-            suppress_warnings=True,
-            max_p=5, max_q=5, max_d=2
+split_idx = int(
+    len(df) * 0.8
+)
+
+
+train = df.iloc[
+    :split_idx
+].copy()
+
+
+test = df.iloc[
+    split_idx:
+].copy()
+
+
+# ============================================================
+# MODEL UNTUK EVALUASI
+#
+# ARIMA(3,0,3)
+#
+# Model dilatih menggunakan data 2021-2024.
+# Kemudian digunakan untuk memprediksi 2025.
+# ============================================================
+
+with st.spinner(
+    "🔍 Mengevaluasi model ARIMA..."
+):
+
+    model_evaluasi = ARIMA(
+        train["harga"],
+        order=(3, 0, 3)
+    ).fit()
+
+
+    prediksi_testing = model_evaluasi.forecast(
+        steps=len(test)
+    )
+
+
+    prediksi_testing.index = test.index
+
+
+# ============================================================
+# NILAI AKTUAL DAN PREDIKSI
+# ============================================================
+
+aktual_testing = test["harga"].values
+
+hasil_testing = prediksi_testing.values
+
+
+# ============================================================
+# EVALUASI RMSE
+# ============================================================
+
+rmse = np.sqrt(
+    mean_squared_error(
+        aktual_testing,
+        hasil_testing
+    )
+)
+
+
+# ============================================================
+# EVALUASI MAE
+# ============================================================
+
+mae = mean_absolute_error(
+    aktual_testing,
+    hasil_testing
+)
+
+
+# ============================================================
+# EVALUASI MAPE
+# ============================================================
+
+mape = np.mean(
+    np.abs(
+        (
+            aktual_testing - hasil_testing
+        )
+        /
+        aktual_testing
+    )
+) * 100
+
+
+# ============================================================
+# KATEGORI MAPE
+# ============================================================
+
+if mape < 10:
+
+    kategori_mape = "Sangat Baik"
+
+elif mape < 20:
+
+    kategori_mape = "Baik"
+
+elif mape < 50:
+
+    kategori_mape = "Cukup"
+
+else:
+
+    kategori_mape = "Kurang Baik"
+
+
+# ============================================================
+# MODEL FINAL UNTUK PREDIKSI 2026
+#
+# Setelah evaluasi selesai, model dilatih kembali
+# menggunakan seluruh data 2021-2025.
+# ============================================================
+
+with st.spinner(
+    "🔮 Menghitung perkiraan harga tahun 2026..."
+):
+
+    model_final = ARIMA(
+        df["harga"],
+        order=(3, 0, 3)
+    ).fit()
+
+
+    prediksi_2026 = model_final.forecast(
+        steps=12
+    )
+
+
+# ============================================================
+# PERIODE PREDIKSI 2026
+# ============================================================
+
+periode_2026 = pd.date_range(
+    start="2026-01-01",
+    periods=12,
+    freq="MS"
+)
+
+
+prediksi_2026.index = periode_2026
+
+
+# ============================================================
+# DATA AKTUAL TAHUN 2025
+# ============================================================
+
+aktual_2025 = df[
+    df.index.year == 2025
+]["harga"].copy()
+
+
+# ============================================================
+# RINGKASAN PREDIKSI
+# ============================================================
+
+rata_rata_prediksi = prediksi_2026.mean()
+
+
+harga_tertinggi = prediksi_2026.max()
+
+
+bulan_tertinggi = prediksi_2026.idxmax()
+
+
+harga_terendah = prediksi_2026.min()
+
+
+bulan_terendah = prediksi_2026.idxmin()
+
+
+rata_rata_aktual_2025 = aktual_2025.mean()
+
+
+perubahan_rata_rata = (
+    (
+        rata_rata_prediksi
+        -
+        rata_rata_aktual_2025
+    )
+    /
+    rata_rata_aktual_2025
+) * 100
+
+
+# ============================================================
+# HEADER
+# ============================================================
+
+st.markdown(
+    '<div class="main-title">'
+    '🌶️ Prediksi Harga Cabai Merah Keriting'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+st.markdown(
+    '<div class="sub-title">'
+    'Provinsi Banten • Data Historis 2021–2025 • Prediksi 2026'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+st.divider()
+
+
+# ============================================================
+# INFORMASI UTAMA
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    '🔮 Perkiraan Harga Cabai Tahun 2026'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+st.info(
+    "Dashboard ini menampilkan perkiraan harga cabai merah "
+    "keriting untuk setiap bulan tahun 2026 berdasarkan pola "
+    "harga yang tercatat dari Januari 2021 sampai Desember 2025."
+)
+
+
+# ============================================================
+# RINGKASAN PERKIRAAN
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    '📌 Ringkasan Perkiraan'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+col1, col2, col3 = st.columns(3)
+
+
+with col1:
+
+    with st.container(border=True):
+
+        st.metric(
+            label="Rata-rata Perkiraan 2026",
+            value=(
+                format_rupiah(
+                    rata_rata_prediksi
+                )
+                + "/kg"
+            )
         )
 
-    p, d, q = model_auto.order
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Model Terbaik</div>
-            <div class="metric-value blue">ARIMA({p},{d},{q})</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">AIC</div>
-            <div class="metric-value">{model_auto.aic():.4f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">BIC</div>
-            <div class="metric-value">{model_auto.bic():.4f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown('<div class="section-header">Diagnostik Residual</div>', unsafe_allow_html=True)
-    model_fit = ARIMA(train['harga'], order=(p, d, q)).fit()
-    fig_diag  = model_fit.plot_diagnostics(figsize=(14, 7))
-    plt.suptitle(f'Diagnostik Residual ARIMA({p},{d},{q})', fontsize=13, fontweight='bold', y=1.01)
-    plt.tight_layout()
-    st.pyplot(fig_diag)
-    plt.close()
+        st.caption(
+            "Rata-rata seluruh perkiraan harga 2026"
+        )
 
 
-# ══════════════════════════════════════════════
-# TAB 3 — EVALUASI MODEL
-# ══════════════════════════════════════════════
-with tab3:
+with col2:
 
-    split_idx  = int(len(df_bulanan) * 0.8)
-    train      = df_bulanan.iloc[:split_idx]
-    test       = df_bulanan.iloc[split_idx:]
+    with st.container(border=True):
 
-    model_auto = auto_arima(
-        train['harga'], seasonal=False,
-        information_criterion='aic', stepwise=True,
-        error_action='ignore', suppress_warnings=True,
-        max_p=5, max_q=5, max_d=2
+        st.metric(
+            label="Perkiraan Harga Tertinggi",
+            value=(
+                format_rupiah(
+                    harga_tertinggi
+                )
+                + "/kg"
+            )
+        )
+
+        st.caption(
+            "Terjadi pada "
+            + nama_bulan_indonesia(
+                bulan_tertinggi
+            )
+            + " 2026"
+        )
+
+
+with col3:
+
+    with st.container(border=True):
+
+        st.metric(
+            label="Perkiraan Harga Terendah",
+            value=(
+                format_rupiah(
+                    harga_terendah
+                )
+                + "/kg"
+            )
+        )
+
+        st.caption(
+            "Terjadi pada "
+            + nama_bulan_indonesia(
+                bulan_terendah
+            )
+            + " 2026"
+        )
+
+
+# ============================================================
+# PREDIKSI SETIAP BULAN
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    '📅 Prediksi Harga Setiap Bulan Tahun 2026'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+st.write(
+    "Setiap kotak menunjukkan perkiraan harga cabai merah "
+    "keriting per kilogram."
+)
+
+
+def kartu_prediksi(index):
+
+    tanggal = prediksi_2026.index[index]
+
+    nilai = prediksi_2026.iloc[index]
+
+    with st.container(border=True):
+
+        st.markdown(
+            "### "
+            + nama_bulan_indonesia(tanggal)
+            + " 2026"
+        )
+
+        st.metric(
+            label="Perkiraan harga",
+            value=(
+                format_rupiah(nilai)
+                + "/kg"
+            )
+        )
+
+
+# Januari - Maret
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    kartu_prediksi(0)
+
+with col2:
+    kartu_prediksi(1)
+
+with col3:
+    kartu_prediksi(2)
+
+
+# April - Juni
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    kartu_prediksi(3)
+
+with col2:
+    kartu_prediksi(4)
+
+with col3:
+    kartu_prediksi(5)
+
+
+# Juli - September
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    kartu_prediksi(6)
+
+with col2:
+    kartu_prediksi(7)
+
+with col3:
+    kartu_prediksi(8)
+
+
+# Oktober - Desember
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    kartu_prediksi(9)
+
+with col2:
+    kartu_prediksi(10)
+
+with col3:
+    kartu_prediksi(11)
+
+
+# ============================================================
+# GRAFIK PREDIKSI 2026
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    '📈 Perkiraan Pergerakan Harga Tahun 2026'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+fig, ax = plt.subplots(
+    figsize=(13, 5)
+)
+
+
+ax.plot(
+    prediksi_2026.index,
+    prediksi_2026.values,
+    marker="o",
+    linewidth=2.5,
+    markersize=6,
+    label="Prediksi 2026"
+)
+
+
+ax.set_title(
+    "Perkiraan Harga Cabai Merah Keriting Tahun 2026",
+    fontsize=14,
+    fontweight="bold"
+)
+
+
+ax.set_xlabel("Bulan")
+
+
+ax.set_ylabel("Harga (Rp/kg)")
+
+
+ax.set_xticks(
+    prediksi_2026.index
+)
+
+
+ax.set_xticklabels(
+    [
+        nama_bulan_indonesia(tanggal)
+        for tanggal in prediksi_2026.index
+    ],
+    rotation=45
+)
+
+
+ax.yaxis.set_major_formatter(
+    plt.FuncFormatter(
+        lambda x, pos:
+        f"Rp {x:,.0f}"
     )
-    p, d, q   = model_auto.order
-    model_fit = ARIMA(train['harga'], order=(p, d, q)).fit()
-
-    pred_test       = model_fit.forecast(steps=len(test))
-    pred_test.index = test.index
-
-    aktual   = test['harga'].values
-    prediksi = pred_test.values
-
-    rmse = np.sqrt(mean_squared_error(aktual, prediksi))
-    mae  = mean_absolute_error(aktual, prediksi)
-    mape = np.mean(np.abs((aktual - prediksi) / aktual)) * 100
-
-    interp, badge_class = interpretasi_mape(mape)
-    warna_m             = warna_mape(mape)
-
-    st.markdown('<div class="section-header">Metrik Evaluasi Akurasi</div>', unsafe_allow_html=True)
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">RMSE</div>
-            <div class="metric-value">Rp {rmse:,.2f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with c2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">MAE</div>
-            <div class="metric-value">Rp {mae:,.2f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with c3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">MAPE</div>
-            <div class="metric-value {warna_m}">{mape:.2f}%</div>
-            <span class="badge {badge_class}">{interp}</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown('<div class="section-header">Grafik Aktual vs Prediksi</div>', unsafe_allow_html=True)
-
-    fig, ax = plt.subplots(figsize=(13, 5))
-    ax.plot(train.index, train['harga'],
-            label='Data Training', color='#2E86AB', linewidth=2)
-    ax.plot(test.index, test['harga'],
-            label='Data Testing (Aktual)', color='#333333', linewidth=2)
-    ax.plot(pred_test.index, pred_test,
-            label=f'Prediksi ARIMA({p},{d},{q})', color='#E84855',
-            linewidth=2, linestyle='--')
-    ax.set_title(f'Aktual vs Prediksi ARIMA({p},{d},{q}) | MAPE: {mape:.2f}%',
-                 fontsize=13, fontweight='bold')
-    ax.set_xlabel('Bulan')
-    ax.set_ylabel('Harga (Rp/kg)')
-    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'Rp {x:,.0f}'))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
-    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    plt.xticks(rotation=30)
-    plt.tight_layout()
-    st.pyplot(fig)
-    plt.close()
-
-    st.markdown('<div class="section-header">Tabel Perbandingan Aktual vs Prediksi</div>', unsafe_allow_html=True)
-    df_eval = pd.DataFrame({
-        'Bulan'         : test.index.strftime('%B %Y'),
-        'Aktual (Rp/kg)': [f"Rp {v:,.0f}" for v in aktual],
-        'Prediksi (Rp/kg)': [f"Rp {v:,.0f}" for v in prediksi],
-        'Selisih (Rp)'  : [f"Rp {abs(a-p):,.0f}" for a, p in zip(aktual, prediksi)]
-    })
-    st.dataframe(df_eval, use_container_width=True, hide_index=True)
+)
 
 
-# ══════════════════════════════════════════════
-# TAB 4 — PREDIKSI 2026
-# ══════════════════════════════════════════════
-with tab4:
+ax.grid(
+    True,
+    alpha=0.25
+)
 
-    split_idx  = int(len(df_bulanan) * 0.8)
-    train      = df_bulanan.iloc[:split_idx]
 
-    model_auto = auto_arima(
-        train['harga'], seasonal=False,
-        information_criterion='aic', stepwise=True,
-        error_action='ignore', suppress_warnings=True,
-        max_p=5, max_q=5, max_d=2
-    )
-    p, d, q    = model_auto.order
-    model_full = ARIMA(df_bulanan['harga'], order=(p, d, q)).fit()
+ax.legend(
+    frameon=False
+)
 
-    forecast  = model_full.get_forecast(steps=12)
-    pred_mean = forecast.predicted_mean
-    pred_ci   = forecast.conf_int(alpha=0.05)
 
-    bulan_2026 = pd.date_range(start='2026-01-01', periods=12, freq='MS')
-    pred_mean.index = bulan_2026
-    pred_ci.index   = bulan_2026
+plt.tight_layout()
 
-    nama_bulan = ['Januari','Februari','Maret','April','Mei','Juni',
-                  'Juli','Agustus','September','Oktober','November','Desember']
 
-    st.markdown('<div class="section-header">Ringkasan Prediksi 2026</div>', unsafe_allow_html=True)
+st.pyplot(fig)
 
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Rata-rata Prediksi</div>
-            <div class="metric-value blue">Rp {pred_mean.mean():,.0f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with c2:
-        idx_max = pred_mean.values.argmax()
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Harga Tertinggi</div>
-            <div class="metric-value red">Rp {pred_mean.max():,.0f}</div>
-            <div style="color:#6b7280;font-size:0.85rem;margin-top:0.3rem">{nama_bulan[idx_max]}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with c3:
-        idx_min = pred_mean.values.argmin()
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Harga Terendah</div>
-            <div class="metric-value green">Rp {pred_mean.min():,.0f}</div>
-            <div style="color:#6b7280;font-size:0.85rem;margin-top:0.3rem">{nama_bulan[idx_min]}</div>
-        </div>
-        """, unsafe_allow_html=True)
 
-    st.markdown('<div class="section-header">Grafik Prediksi 2026</div>', unsafe_allow_html=True)
+plt.close(fig)
 
-    historis_terakhir = df_bulanan.iloc[-12:]
-    fig, ax = plt.subplots(figsize=(13, 5))
-    ax.plot(historis_terakhir.index, historis_terakhir['harga'],
-            label='Data Historis (2025)', color='#2E86AB',
-            linewidth=2, marker='o', markersize=5)
-    ax.plot(pred_mean.index, pred_mean.values,
-            label='Prediksi 2026', color='#E84855',
-            linewidth=2.5, marker='s', markersize=6, linestyle='--')
-    ax.fill_between(pred_ci.index, pred_ci.iloc[:, 0], pred_ci.iloc[:, 1],
-                    alpha=0.2, color='#E84855', label='Interval Kepercayaan 95%')
-    ax.axvline(x=pd.Timestamp('2026-01-01'), color='gray', linestyle=':', linewidth=1.5)
-    ax.set_title(f'Prediksi Harga Cabai Merah Keriting Provinsi Banten 2026\n'
-                 f'ARIMA({p},{d},{q}) | Interval Kepercayaan 95%',
-                 fontsize=13, fontweight='bold')
-    ax.set_xlabel('Bulan')
-    ax.set_ylabel('Harga (Rp/kg)')
-    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'Rp {x:,.0f}'))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
-    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
-    ax.legend(loc='upper left')
-    ax.grid(True, alpha=0.3)
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    st.pyplot(fig)
-    plt.close()
 
-    st.markdown('<div class="section-header">Tabel Prediksi Harga Per Bulan 2026</div>', unsafe_allow_html=True)
+# ============================================================
+# HASIL EVALUASI MODEL
+# ============================================================
 
-    df_pred = pd.DataFrame({
-        'Bulan'              : nama_bulan,
-        'Periode'            : bulan_2026.strftime('%Y-%m'),
-        'Prediksi (Rp/kg)'  : [f"Rp {v:,.0f}" for v in pred_mean.values],
-        'Batas Bawah (Rp/kg)': [f"Rp {v:,.0f}" for v in pred_ci.iloc[:, 0].values],
-        'Batas Atas (Rp/kg)' : [f"Rp {v:,.0f}" for v in pred_ci.iloc[:, 1].values],
-    })
-    st.dataframe(df_pred, use_container_width=True, hide_index=True)
+st.markdown(
+    '<div class="section-title">'
+    '🎯 Hasil Evaluasi Model'
+    '</div>',
+    unsafe_allow_html=True
+)
 
-    st.markdown('<div class="section-header">Unduh Hasil Prediksi</div>', unsafe_allow_html=True)
 
-    df_download = pd.DataFrame({
-        'bulan'          : nama_bulan,
-        'periode'        : bulan_2026.strftime('%Y-%m'),
-        'prediksi_harga' : pred_mean.values.round(0).astype(int),
-        'batas_bawah'    : pred_ci.iloc[:, 0].values.round(0).astype(int),
-        'batas_atas'     : pred_ci.iloc[:, 1].values.round(0).astype(int),
-    })
+st.info(
+    "Evaluasi dilakukan menggunakan data tahun 2025 sebagai "
+    "data pengujian. Model terlebih dahulu mempelajari data "
+    "tahun 2021 sampai 2024, kemudian hasil prediksinya "
+    "dibandingkan dengan harga aktual tahun 2025."
+)
 
-    st.download_button(
-        label="⬇️ Download Prediksi 2026 (.csv)",
-        data=df_download.to_csv(index=False).encode('utf-8'),
-        file_name='prediksi_cabai_banten_2026.csv',
-        mime='text/csv'
+
+# ============================================================
+# KARTU EVALUASI
+# ============================================================
+
+col1, col2, col3 = st.columns(3)
+
+
+with col1:
+
+    with st.container(border=True):
+
+        st.metric(
+            label="RMSE",
+            value=format_rupiah(rmse)
+        )
+
+        st.caption(
+            "Semakin kecil, semakin baik."
+        )
+
+
+with col2:
+
+    with st.container(border=True):
+
+        st.metric(
+            label="MAE",
+            value=format_rupiah(mae)
+        )
+
+        st.caption(
+            "Rata-rata besar kesalahan prediksi."
+        )
+
+
+with col3:
+
+    with st.container(border=True):
+
+        st.metric(
+            label="MAPE",
+            value=f"{mape:.2f}%"
+        )
+
+        st.caption(
+            "Kategori: "
+            + kategori_mape
+        )
+
+
+# ============================================================
+# PENJELASAN EVALUASI
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    '📖 Apa Arti Hasil Evaluasi?'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+st.write(
+    f"Model menghasilkan nilai **RMSE sebesar "
+    f"{format_rupiah(rmse)}**. Nilai ini menunjukkan "
+    f"besarnya kesalahan prediksi dengan mempertimbangkan "
+    f"selisih antara harga aktual dan hasil prediksi. "
+    f"Semakin kecil nilai RMSE, semakin dekat hasil prediksi "
+    f"dengan harga aktual."
+)
+
+
+st.write(
+    f"Nilai **MAE sebesar {format_rupiah(mae)}** menunjukkan "
+    f"bahwa rata-rata terdapat selisih sekitar "
+    f"**{format_rupiah(mae)}** antara harga yang diprediksi "
+    f"model dengan harga aktual pada data pengujian."
+)
+
+
+st.write(
+    f"Nilai **MAPE sebesar {mape:.2f}%** menunjukkan rata-rata "
+    f"persentase kesalahan prediksi model terhadap harga aktual. "
+    f"Nilai tersebut termasuk kategori **{kategori_mape}**."
+)
+
+
+# ============================================================
+# INTERPRETASI MAPE
+# ============================================================
+
+if mape < 10:
+
+    st.success(
+        f"✅ MAPE sebesar {mape:.2f}% termasuk kategori "
+        "**sangat baik**. Artinya, secara rata-rata kesalahan "
+        "prediksi relatif kecil terhadap harga aktual."
     )
 
-# ─────────────────────────────────────────────
+elif mape < 20:
+
+    st.success(
+        f"✅ MAPE sebesar {mape:.2f}% termasuk kategori "
+        "**baik**. Artinya, model memiliki tingkat kesalahan "
+        "yang relatif rendah dalam melakukan prediksi."
+    )
+
+elif mape < 50:
+
+    st.warning(
+        f"⚠️ MAPE sebesar {mape:.2f}% termasuk kategori "
+        "**cukup**. Artinya, model masih dapat digunakan "
+        "sebagai gambaran perkiraan, tetapi hasil prediksi "
+        "memiliki selisih yang cukup terhadap harga aktual."
+    )
+
+else:
+
+    st.error(
+        f"⚠️ MAPE sebesar {mape:.2f}% termasuk kategori "
+        "**kurang baik**. Artinya, hasil prediksi memiliki "
+        "kesalahan yang relatif besar terhadap harga aktual."
+    )
+
+
+# ============================================================
+# GRAFIK EVALUASI
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    '📊 Perbandingan Aktual dan Prediksi pada Data Pengujian'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+st.write(
+    "Grafik ini menunjukkan perbandingan harga aktual tahun "
+    "2025 dengan hasil prediksi model pada periode pengujian."
+)
+
+
+fig_eval, ax_eval = plt.subplots(
+    figsize=(13, 5.5)
+)
+
+
+ax_eval.plot(
+    test.index,
+    test["harga"],
+    marker="o",
+    linewidth=2.5,
+    label="Harga Aktual 2025"
+)
+
+
+ax_eval.plot(
+    prediksi_testing.index,
+    prediksi_testing.values,
+    marker="s",
+    linestyle="--",
+    linewidth=2.5,
+    label="Hasil Prediksi Model"
+)
+
+
+ax_eval.set_title(
+    "Evaluasi Model ARIMA pada Data Pengujian Tahun 2025",
+    fontsize=14,
+    fontweight="bold"
+)
+
+
+ax_eval.set_xlabel("Bulan")
+
+
+ax_eval.set_ylabel("Harga (Rp/kg)")
+
+
+ax_eval.set_xticks(
+    test.index
+)
+
+
+ax_eval.set_xticklabels(
+    [
+        nama_bulan_indonesia(tanggal)
+        for tanggal in test.index
+    ],
+    rotation=45
+)
+
+
+ax_eval.yaxis.set_major_formatter(
+    plt.FuncFormatter(
+        lambda x, pos:
+        f"Rp {x:,.0f}"
+    )
+)
+
+
+ax_eval.grid(
+    True,
+    alpha=0.25
+)
+
+
+ax_eval.legend(
+    frameon=False
+)
+
+
+plt.tight_layout()
+
+
+st.pyplot(fig_eval)
+
+
+plt.close(fig_eval)
+
+
+# ============================================================
+# PENJELASAN GRAFIK EVALUASI
+# ============================================================
+
+st.info(
+    "Cara membacanya sederhana. Garis harga aktual menunjukkan "
+    "harga yang benar-benar tercatat pada tahun 2025. Garis "
+    "hasil prediksi menunjukkan perkiraan model untuk periode "
+    "yang sama. Semakin dekat kedua garis tersebut, semakin "
+    "baik model mengikuti pola harga aktual."
+)
+
+
+# ============================================================
+# PERBANDINGAN 2025 VS 2026
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    '📊 Perbandingan Harga Aktual 2025 dan Prediksi 2026'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+st.info(
+    "Bagian ini berbeda dengan evaluasi model. Evaluasi model "
+    "digunakan untuk mengetahui kinerja model, sedangkan "
+    "perbandingan 2025 dan 2026 digunakan untuk memberikan "
+    "gambaran perubahan harga dari tahun 2025 ke tahun 2026."
+)
+
+
+# ============================================================
+# GRAFIK PERBANDINGAN
+# ============================================================
+
+fig2, ax2 = plt.subplots(
+    figsize=(13, 5.5)
+)
+
+
+ax2.plot(
+    aktual_2025.index,
+    aktual_2025.values,
+    marker="o",
+    linewidth=2.5,
+    label="Aktual 2025"
+)
+
+
+ax2.plot(
+    prediksi_2026.index,
+    prediksi_2026.values,
+    marker="s",
+    linestyle="--",
+    linewidth=2.5,
+    label="Prediksi 2026"
+)
+
+
+ax2.set_title(
+    "Perbandingan Harga Aktual 2025 dan Prediksi 2026",
+    fontsize=14,
+    fontweight="bold"
+)
+
+
+ax2.set_xlabel("Bulan")
+
+
+ax2.set_ylabel("Harga (Rp/kg)")
+
+
+ax2.set_xticks(
+    prediksi_2026.index
+)
+
+
+ax2.set_xticklabels(
+    [
+        nama_bulan_indonesia(tanggal)
+        for tanggal in prediksi_2026.index
+    ],
+    rotation=45
+)
+
+
+ax2.yaxis.set_major_formatter(
+    plt.FuncFormatter(
+        lambda x, pos:
+        f"Rp {x:,.0f}"
+    )
+)
+
+
+ax2.grid(
+    True,
+    alpha=0.25
+)
+
+
+ax2.legend(
+    frameon=False
+)
+
+
+plt.tight_layout()
+
+
+st.pyplot(fig2)
+
+
+plt.close(fig2)
+
+
+# ============================================================
+# TABEL PERBANDINGAN
+# MENGGUNAKAN PANDAS STYLER
+# TIDAK MENGGUNAKAN HTML TABLE
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    '📋 Tabel Perbandingan Setiap Bulan'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+st.write(
+    "Warna hijau menunjukkan harga prediksi 2026 lebih tinggi "
+    "daripada harga aktual 2025. Warna merah menunjukkan "
+    "harga prediksi 2026 lebih rendah."
+)
+
+
+# ============================================================
+# MEMBUAT DATAFRAME TABEL
+# ============================================================
+
+data_tabel = []
+
+
+for i in range(12):
+
+    tanggal = aktual_2025.index[i]
+
+    aktual = aktual_2025.iloc[i]
+
+    prediksi = prediksi_2026.iloc[i]
+
+    perubahan = (
+        (
+            prediksi - aktual
+        )
+        /
+        aktual
+    ) * 100
+
+
+    if perubahan > 0:
+
+        status = "↑ Naik"
+
+    elif perubahan < 0:
+
+        status = "↓ Turun"
+
+    else:
+
+        status = "Tetap"
+
+
+    data_tabel.append(
+        {
+            "Bulan":
+                nama_bulan_indonesia(tanggal),
+
+            "Harga Aktual 2025":
+                aktual,
+
+            "Harga Prediksi 2026":
+                prediksi,
+
+            "Perubahan (%)":
+                perubahan,
+
+            "Keterangan":
+                status
+        }
+    )
+
+
+df_perbandingan = pd.DataFrame(
+    data_tabel
+)
+
+
+# ============================================================
+# FUNGSI FORMAT RUPIAH PADA STYLER
+# ============================================================
+
+def format_rupiah_styler(nilai):
+
+    return (
+        "Rp {:,.0f}/kg"
+        .format(float(nilai))
+        .replace(",", ".")
+    )
+
+
+# ============================================================
+# FUNGSI WARNA PREDIKSI
+# ============================================================
+
+def warna_prediksi(row):
+
+    styles = pd.Series(
+        "",
+        index=row.index
+    )
+
+
+    if row["Perubahan (%)"] > 0:
+
+        styles["Harga Prediksi 2026"] = (
+            "background-color: #dcfce7;"
+            "color: #166534;"
+            "font-weight: 600;"
+        )
+
+        styles["Perubahan (%)"] = (
+            "background-color: #dcfce7;"
+            "color: #166534;"
+            "font-weight: 600;"
+        )
+
+        styles["Keterangan"] = (
+            "background-color: #dcfce7;"
+            "color: #166534;"
+            "font-weight: 600;"
+        )
+
+
+    elif row["Perubahan (%)"] < 0:
+
+        styles["Harga Prediksi 2026"] = (
+            "background-color: #fee2e2;"
+            "color: #991b1b;"
+            "font-weight: 600;"
+        )
+
+        styles["Perubahan (%)"] = (
+            "background-color: #fee2e2;"
+            "color: #991b1b;"
+            "font-weight: 600;"
+        )
+
+        styles["Keterangan"] = (
+            "background-color: #fee2e2;"
+            "color: #991b1b;"
+            "font-weight: 600;"
+        )
+
+
+    return styles
+
+
+# ============================================================
+# FORMAT TABEL
+# ============================================================
+
+styled_table = (
+
+    df_perbandingan
+    .style
+    .apply(
+        warna_prediksi,
+        axis=1
+    )
+    .format(
+        {
+            "Harga Aktual 2025":
+                format_rupiah_styler,
+
+            "Harga Prediksi 2026":
+                format_rupiah_styler,
+
+            "Perubahan (%)":
+                lambda x:
+                f"{x:+.2f}%"
+        }
+    )
+)
+
+
+# ============================================================
+# TAMPILKAN TABEL
+# ============================================================
+
+st.dataframe(
+    styled_table,
+    use_container_width=True,
+    hide_index=True
+)
+
+
+# ============================================================
+# PENJELASAN TABEL
+# ============================================================
+
+st.caption(
+    "Harga aktual 2025 merupakan harga yang benar-benar "
+    "tercatat, sedangkan harga prediksi 2026 merupakan "
+    "hasil perkiraan model ARIMA."
+)
+
+
+# ============================================================
+# KESIMPULAN PERBANDINGAN
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    '📌 Kesimpulan Perbandingan'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+if perubahan_rata_rata > 0:
+
+    st.warning(
+        f"Rata-rata harga aktual tahun 2025 adalah "
+        f"{format_rupiah(rata_rata_aktual_2025)}/kg. "
+        f"Rata-rata harga tahun 2026 diperkirakan "
+        f"{format_rupiah(rata_rata_prediksi)}/kg. "
+        f"Secara rata-rata, harga tahun 2026 diperkirakan "
+        f"naik sebesar {perubahan_rata_rata:.2f}% "
+        f"dibandingkan tahun 2025."
+    )
+
+
+elif perubahan_rata_rata < 0:
+
+    st.success(
+        f"Rata-rata harga aktual tahun 2025 adalah "
+        f"{format_rupiah(rata_rata_aktual_2025)}/kg. "
+        f"Rata-rata harga tahun 2026 diperkirakan "
+        f"{format_rupiah(rata_rata_prediksi)}/kg. "
+        f"Secara rata-rata, harga tahun 2026 diperkirakan "
+        f"turun sebesar {abs(perubahan_rata_rata):.2f}% "
+        f"dibandingkan tahun 2025."
+    )
+
+
+else:
+
+    st.info(
+        "Rata-rata harga tahun 2025 dan perkiraan tahun 2026 "
+        "berada pada tingkat yang relatif sama."
+    )
+
+
+# ============================================================
+# CARA MEMBACA DASHBOARD
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    '📖 Cara Membaca Dashboard'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+st.info(
+    "Pertama, lihat bagian Perkiraan Harga 2026 untuk mengetahui "
+    "harga yang diperkirakan pada setiap bulan. Kedua, lihat "
+    "Hasil Evaluasi Model untuk mengetahui seberapa baik model "
+    "melakukan prediksi. Ketiga, lihat Tabel Perbandingan untuk "
+    "melihat perbedaan harga aktual tahun 2025 dengan perkiraan "
+    "harga tahun 2026."
+)
+
+
+# ============================================================
+# CATATAN
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    '⚠️ Catatan'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+
+st.warning(
+    "Harga tahun 2026 merupakan hasil perkiraan berdasarkan "
+    "pola data historis Januari 2021 sampai Desember 2025. "
+    "Harga sebenarnya dapat berbeda karena kondisi pasar, "
+    "pasokan, permintaan, musim, cuaca, dan faktor lainnya."
+)
+
+
+# ============================================================
 # FOOTER
-# ─────────────────────────────────────────────
-st.markdown('<hr class="divider">', unsafe_allow_html=True)
-st.markdown("""
-<div style="text-align:center; color:#9ca3af; font-size:0.8rem; padding: 1rem 0;">
-    Prediksi Harga Cabai Merah Keriting Provinsi Banten •
-    Algoritma ARIMA • Data PIHPS Nasional (hargapangan.id) •
-    Diolah menggunakan Python & Streamlit
-</div>
-""", unsafe_allow_html=True)
+# ============================================================
+
+st.divider()
+
+
+st.caption(
+    "Sumber data: PIHPS Nasional (hargapangan.id)"
+)
+
+
+st.caption(
+    "Data historis: Januari 2021 - Desember 2025"
+)
+
+
+st.caption(
+    "Metode prediksi: ARIMA(3,0,3)"
+)
+
+
+st.caption(
+    "Evaluasi model: Data testing tahun 2025"
+)
+
+
+st.caption(
+    "Periode prediksi: Januari - Desember 2026"
+)
