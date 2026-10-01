@@ -91,52 +91,48 @@ st.write(
     f"**{nama_bulan[bulan_terendah.month]}** sebesar **{format_rupiah(terendah)}/kg**."
 )
 
-# Grafik 1: seluruh prediksi tahun 2026.
-st.markdown('<div class="section-title">📈 Prediksi Harga Setiap Bulan Tahun 2026</div>', unsafe_allow_html=True)
-st.caption("Grafik pertama menunjukkan hasil prediksi model ARIMA(3,0,3) untuk Januari-Desember 2026.")
-fig1, ax1 = plt.subplots(figsize=(13, 5))
-ax1.plot(
-    prediksi_2026.index, prediksi_2026.values,
-    marker="o", linewidth=2.5, markersize=6, label="Prediksi 2026"
+# Grafik gabungan: data aktual Januari-Juli dan prediksi Januari-Desember 2026.
+# Garis aktual berhenti pada Juli karena data aktual setelah Juli belum tersedia.
+# Garis prediksi diteruskan sampai Desember.
+st.markdown(
+    '<div class="section-title">📊 Perbandingan Data Aktual dan Prediksi Harga Tahun 2026</div>',
+    unsafe_allow_html=True
 )
-ax1.set_title("Prediksi Harga Cabai Merah Keriting Tahun 2026", fontsize=14, fontweight="bold")
-ax1.set_xlabel("Bulan")
-ax1.set_ylabel("Harga (Rp/kg)")
-ax1.set_xticks(prediksi_2026.index)
-ax1.set_xticklabels([nama_bulan[t.month] for t in prediksi_2026.index], rotation=45)
-ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, pos: f"Rp {x:,.0f}".replace(",", ".")))
-ax1.grid(True, alpha=0.25)
-ax1.legend(frameon=False)
-plt.tight_layout()
-st.pyplot(fig1)
-plt.close(fig1)
+st.caption(
+    "Grafik menampilkan data aktual dari Januari-Juli 2026 dan hasil prediksi "
+    "ARIMA(3,0,3) dari Januari-Desember 2026."
+)
 
-# Grafik 2: perbandingan aktual dan prediksi Januari-Juli 2026.
-st.markdown('<div class="section-title">📊 Perbandingan Data Aktual dan Prediksi Januari-Juli 2026</div>', unsafe_allow_html=True)
-st.caption("Grafik kedua membandingkan harga aktual yang telah tersedia dengan hasil prediksi pada bulan yang sama.")
-fig2, ax2 = plt.subplots(figsize=(13, 5))
-ax2.plot(
+fig, ax = plt.subplots(figsize=(13, 5))
+ax.plot(
     aktual_2026.index, aktual_2026.values,
-    marker="o", linewidth=2.2, markersize=6, label="Data Aktual 2026"
+    marker="o", linewidth=2.2, markersize=6,
+    label="Data Aktual 2026"
 )
-ax2.plot(
-    prediksi_2026.index[:7], prediksi_2026.values[:7],
-    marker="s", linestyle="--", linewidth=2.2, markersize=6, label="Prediksi ARIMA(3,0,3)"
+ax.plot(
+    prediksi_2026.index, prediksi_2026.values,
+    marker="s", linestyle="--", linewidth=2.2, markersize=6,
+    label="Prediksi ARIMA(3,0,3)"
 )
-ax2.set_title(
-    "Perbandingan Data Aktual dan Prediksi Harga Cabai Merah Keriting Banten Januari-Juli 2026",
+ax.set_title(
+    "Perbandingan Data Aktual dan Prediksi Harga Cabai Merah Keriting Banten Tahun 2026",
     fontsize=13, fontweight="bold"
 )
-ax2.set_xlabel("Bulan")
-ax2.set_ylabel("Harga (Rp/kg)")
-ax2.set_xticks(aktual_2026.index)
-ax2.set_xticklabels([nama_bulan[t.month] + " 2026" for t in aktual_2026.index], rotation=45)
-ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, pos: f"Rp {x:,.0f}".replace(",", ".")))
-ax2.grid(True, alpha=0.25)
-ax2.legend(frameon=False)
+ax.set_xlabel("Bulan")
+ax.set_ylabel("Harga (Rp/kg)")
+ax.set_xticks(prediksi_2026.index)
+ax.set_xticklabels(
+    [nama_bulan[t.month] + " 2026" for t in prediksi_2026.index],
+    rotation=45
+)
+ax.yaxis.set_major_formatter(
+    plt.FuncFormatter(lambda x, pos: f"Rp {x:,.0f}".replace(",", "."))
+)
+ax.grid(True, alpha=0.25)
+ax.legend(frameon=False)
 plt.tight_layout()
-st.pyplot(fig2)
-plt.close(fig2)
+st.pyplot(fig)
+plt.close(fig)
 
 # Tabel perbandingan aktual dan prediksi untuk Januari-Juli 2026.
 st.markdown('<div class="section-title">📋 Tabel Perbandingan Data Aktual dan Prediksi 2026</div>', unsafe_allow_html=True)
