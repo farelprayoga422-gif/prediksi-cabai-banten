@@ -134,20 +134,45 @@ plt.tight_layout()
 st.pyplot(fig)
 plt.close(fig)
 
-# Tabel perbandingan aktual dan prediksi untuk Januari-Juli 2026.
+# Tabel prediksi Januari-Desember 2026, dengan perbandingan aktual untuk Januari-Juli.
 st.markdown('<div class="section-title">📋 Tabel Perbandingan Data Aktual dan Prediksi 2026</div>', unsafe_allow_html=True)
 
+# Tabel ditampilkan Januari-Desember. Data aktual dan metrik perbandingan
+# hanya tersedia Januari-Juli; Agustus-Desember diisi tanda "-" karena belum ada data aktual.
 selisih = prediksi_2026.iloc[:7].values - aktual_2026.values
 persen_selisih = (selisih / aktual_2026.values) * 100
 
-tabel = pd.DataFrame({
-    "Bulan": [nama_bulan[t.month] for t in aktual_2026.index],
-    "Harga Aktual 2026": [format_rupiah(v) for v in aktual_2026.values],
-    "Harga Prediksi 2026": [format_rupiah(v) for v in prediksi_2026.iloc[:7].values],
-    "Selisih (Rp/kg)": [format_rupiah(abs(v)) for v in selisih],
-    "Perbedaan (%)": [f"{abs(v):.2f}%".replace(".", ",") for v in persen_selisih],
-    "Keterangan": ["Prediksi lebih tinggi" if v > 0 else "Prediksi lebih rendah" if v < 0 else "Sama" for v in selisih]
-})
+baris_tabel = []
+for i, tanggal in enumerate(prediksi_2026.index):
+    prediksi = prediksi_2026.iloc[i]
+    if i < len(aktual_2026):
+        aktual = aktual_2026.iloc[i]
+        beda = prediksi - aktual
+        persen = (beda / aktual) * 100
+        keterangan = (
+            "Prediksi lebih tinggi" if beda > 0
+            else "Prediksi lebih rendah" if beda < 0
+            else "Sama"
+        )
+        aktual_teks = format_rupiah(aktual)
+        selisih_teks = format_rupiah(abs(beda))
+        persen_teks = f"{abs(persen):.2f}%".replace(".", ",")
+    else:
+        aktual_teks = "-"
+        selisih_teks = "-"
+        persen_teks = "-"
+        keterangan = "Belum ada data aktual"
+
+    baris_tabel.append({
+        "Bulan": nama_bulan[tanggal.month],
+        "Harga Aktual 2026": aktual_teks,
+        "Harga Prediksi 2026": format_rupiah(prediksi),
+        "Selisih (Rp/kg)": selisih_teks,
+        "Perbedaan (%)": persen_teks,
+        "Keterangan": keterangan
+    })
+
+tabel = pd.DataFrame(baris_tabel)
 st.dataframe(tabel, use_container_width=True, hide_index=True)
 
 st.markdown('<div class="section-title">📌 Kesimpulan Perbandingan</div>', unsafe_allow_html=True)
@@ -155,8 +180,8 @@ rata_selisih = abs(persen_selisih).mean()
 st.success(
     f"Berdasarkan perbandingan Januari-Juli 2026, rata-rata perbedaan absolut antara "
     f"harga aktual dan hasil prediksi adalah **{rata_selisih:.2f}%**. "
-    "Perbedaan ini menunjukkan bahwa hasil prediksi model tidak selalu sama dengan "
-    "harga yang terjadi di pasar."
+    "Untuk Agustus-Desember, tabel hanya menampilkan hasil prediksi karena data aktual "
+    "belum tersedia."
 )
 
 st.markdown('<div class="section-title">📘 Cara Membaca Dashboard</div>', unsafe_allow_html=True)
