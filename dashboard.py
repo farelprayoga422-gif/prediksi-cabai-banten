@@ -25,21 +25,25 @@ nama_bulan = {
 def format_rupiah(nilai):
     return "Rp {:,.0f}".format(float(nilai)).replace(",", ".")
 
-# Hasil forecast ARIMA(3,0,3) dari model yang dilatih ulang
-# menggunakan seluruh data Januari 2021-Desember 2025.
+# Prediksi ARIMA(3,0,3), model dilatih ulang menggunakan data Januari 2021-Desember 2025.
 hasil_forecast = [
-    50632.0, 47604.0, 40030.0, 42695.0,
-    49476.0, 52131.0, 49977.0, 47293.0,
-    46936.0, 48205.0, 49129.0, 48964.0
+    50632, 47604, 40030, 42695, 49476, 52131,
+    49977, 47293, 46936, 48205, 49129, 48964
 ]
 
-prediksi_2026 = pd.Series(
-    hasil_forecast,
-    index=pd.date_range("2026-01-01", periods=12, freq="MS"),
-    name="Prediksi Harga"
+# Data aktual yang tersedia untuk Januari-Juli 2026.
+# Bulan Agustus-Desember tidak ditampilkan dalam perbandingan karena data aktual belum tersedia.
+aktual_jan_jul = [36745, 42900, 42655, 45384, 56543, 49255, 39196]
+
+tanggal_2026 = pd.date_range("2026-01-01", periods=12, freq="MS")
+prediksi_2026 = pd.Series(hasil_forecast, index=tanggal_2026, name="Prediksi")
+aktual_2026 = pd.Series(
+    aktual_jan_jul,
+    index=tanggal_2026[:7],
+    name="Aktual"
 )
 
-# Ringkasan dihitung dari seluruh prediksi Januari-Desember 2026.
+# Ringkasan prediksi dihitung dari seluruh bulan Januari-Desember 2026.
 rata_rata = prediksi_2026.mean()
 tertinggi = prediksi_2026.max()
 bulan_tertinggi = prediksi_2026.idxmax()
@@ -56,99 +60,129 @@ st.markdown(
 )
 st.divider()
 
-st.markdown(
-    '<div class="section-title">🔮 Prediksi Harga Tahun 2026</div>',
-    unsafe_allow_html=True
-)
+st.markdown('<div class="section-title">🔮 Perkiraan Harga Cabai Tahun 2026</div>', unsafe_allow_html=True)
 st.info(
-    "Dashboard ini menyajikan hasil prediksi harga eceran cabai merah keriting "
-    "di Provinsi Banten untuk tahun 2026. Prediksi menggunakan model "
-    "ARIMA(3,0,3) yang dilatih ulang dengan data historis Januari 2021 "
-    "sampai Desember 2025."
+    "Dashboard ini menyajikan hasil prediksi harga cabai merah keriting di Provinsi Banten "
+    "untuk tahun 2026 menggunakan model ARIMA(3,0,3) yang dilatih ulang dengan data historis "
+    "Januari 2021 sampai Desember 2025."
 )
 
-# 1. RINGKASAN PERKIRAAN
-st.markdown(
-    '<div class="section-title">📌 Ringkasan Perkiraan</div>',
-    unsafe_allow_html=True
-)
+# Ringkasan perkiraan dalam tiga kotak.
+st.markdown('<div class="section-title">📌 Ringkasan Perkiraan</div>', unsafe_allow_html=True)
 col1, col2, col3 = st.columns(3)
-
 with col1:
     with st.container(border=True):
         st.metric("Rata-rata Perkiraan 2026", f"{format_rupiah(rata_rata)}/kg")
         st.caption("Rata-rata prediksi Januari-Desember 2026")
-
 with col2:
     with st.container(border=True):
         st.metric("Perkiraan Harga Tertinggi", f"{format_rupiah(tertinggi)}/kg")
         st.caption(f"Diperkirakan pada {nama_bulan[bulan_tertinggi.month]} 2026")
-
 with col3:
     with st.container(border=True):
         st.metric("Perkiraan Harga Terendah", f"{format_rupiah(terendah)}/kg")
         st.caption(f"Diperkirakan pada {nama_bulan[bulan_terendah.month]} 2026")
 
 st.write(
-    f"Rata-rata harga cabai merah keriting sepanjang tahun 2026 diperkirakan "
-    f"sebesar **{format_rupiah(rata_rata)}/kg**. Harga tertinggi diperkirakan "
-    f"terjadi pada **{nama_bulan[bulan_tertinggi.month]}** sebesar "
-    f"**{format_rupiah(tertinggi)}/kg**, sedangkan harga terendah diperkirakan "
-    f"terjadi pada **{nama_bulan[bulan_terendah.month]}** sebesar "
-    f"**{format_rupiah(terendah)}/kg**."
+    f"Rata-rata harga cabai merah keriting sepanjang tahun 2026 diperkirakan sebesar "
+    f"**{format_rupiah(rata_rata)}/kg**. Harga tertinggi diperkirakan terjadi pada "
+    f"**{nama_bulan[bulan_tertinggi.month]}** sebesar **{format_rupiah(tertinggi)}/kg**, "
+    f"sedangkan harga terendah diperkirakan terjadi pada "
+    f"**{nama_bulan[bulan_terendah.month]}** sebesar **{format_rupiah(terendah)}/kg**."
 )
 
-# 2. PREDIKSI HARGA TAHUN 2026
-st.markdown(
-    '<div class="section-title">📈 Perkiraan Pergerakan Harga Tahun 2026</div>',
-    unsafe_allow_html=True
-)
-fig, ax = plt.subplots(figsize=(13, 5))
-ax.plot(
+# Grafik 1: seluruh prediksi tahun 2026.
+st.markdown('<div class="section-title">📈 Prediksi Harga Setiap Bulan Tahun 2026</div>', unsafe_allow_html=True)
+st.caption("Grafik pertama menunjukkan hasil prediksi model ARIMA(3,0,3) untuk Januari-Desember 2026.")
+fig1, ax1 = plt.subplots(figsize=(13, 5))
+ax1.plot(
     prediksi_2026.index, prediksi_2026.values,
     marker="o", linewidth=2.5, markersize=6, label="Prediksi 2026"
 )
-ax.set_title("Prediksi Harga Cabai Merah Keriting Tahun 2026", fontsize=14, fontweight="bold")
-ax.set_xlabel("Bulan")
-ax.set_ylabel("Harga (Rp/kg)")
-ax.set_xticks(prediksi_2026.index)
-ax.set_xticklabels(
-    [nama_bulan[t.month] for t in prediksi_2026.index],
-    rotation=45
-)
-ax.yaxis.set_major_formatter(
-    plt.FuncFormatter(lambda x, pos: f"Rp {x:,.0f}".replace(",", "."))
-)
-ax.grid(True, alpha=0.25)
-ax.legend(frameon=False)
+ax1.set_title("Prediksi Harga Cabai Merah Keriting Tahun 2026", fontsize=14, fontweight="bold")
+ax1.set_xlabel("Bulan")
+ax1.set_ylabel("Harga (Rp/kg)")
+ax1.set_xticks(prediksi_2026.index)
+ax1.set_xticklabels([nama_bulan[t.month] for t in prediksi_2026.index], rotation=45)
+ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, pos: f"Rp {x:,.0f}".replace(",", ".")))
+ax1.grid(True, alpha=0.25)
+ax1.legend(frameon=False)
 plt.tight_layout()
-st.pyplot(fig)
-plt.close(fig)
-st.caption("Grafik menampilkan pergerakan hasil prediksi harga untuk Januari-Desember 2026.")
+st.pyplot(fig1)
+plt.close(fig1)
 
-# 3. TABEL PREDIKSI JANUARI-JULI 2026
-st.markdown(
-    '<div class="section-title">📋 Tabel Prediksi Harga Tahun 2026 (Januari-Juli)</div>',
-    unsafe_allow_html=True
+# Grafik 2: perbandingan aktual dan prediksi Januari-Juli 2026.
+st.markdown('<div class="section-title">📊 Perbandingan Data Aktual dan Prediksi Januari-Juli 2026</div>', unsafe_allow_html=True)
+st.caption("Grafik kedua membandingkan harga aktual yang telah tersedia dengan hasil prediksi pada bulan yang sama.")
+fig2, ax2 = plt.subplots(figsize=(13, 5))
+ax2.plot(
+    aktual_2026.index, aktual_2026.values,
+    marker="o", linewidth=2.2, markersize=6, label="Data Aktual 2026"
 )
-prediksi_jan_jul = prediksi_2026.iloc[:7]
-tabel_prediksi = pd.DataFrame({
-    "Bulan": [nama_bulan[t.month] for t in prediksi_jan_jul.index],
-    "Prediksi Harga (Rp/kg)": [format_rupiah(v) for v in prediksi_jan_jul.values]
+ax2.plot(
+    prediksi_2026.index[:7], prediksi_2026.values[:7],
+    marker="s", linestyle="--", linewidth=2.2, markersize=6, label="Prediksi ARIMA(3,0,3)"
+)
+ax2.set_title(
+    "Perbandingan Data Aktual dan Prediksi Harga Cabai Merah Keriting Banten Januari-Juli 2026",
+    fontsize=13, fontweight="bold"
+)
+ax2.set_xlabel("Bulan")
+ax2.set_ylabel("Harga (Rp/kg)")
+ax2.set_xticks(aktual_2026.index)
+ax2.set_xticklabels([nama_bulan[t.month] + " 2026" for t in aktual_2026.index], rotation=45)
+ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, pos: f"Rp {x:,.0f}".replace(",", ".")))
+ax2.grid(True, alpha=0.25)
+ax2.legend(frameon=False)
+plt.tight_layout()
+st.pyplot(fig2)
+plt.close(fig2)
+
+# Tabel perbandingan aktual dan prediksi untuk Januari-Juli 2026.
+st.markdown('<div class="section-title">📋 Tabel Perbandingan Data Aktual dan Prediksi 2026</div>', unsafe_allow_html=True)
+
+selisih = prediksi_2026.iloc[:7].values - aktual_2026.values
+persen_selisih = (selisih / aktual_2026.values) * 100
+
+tabel = pd.DataFrame({
+    "Bulan": [nama_bulan[t.month] for t in aktual_2026.index],
+    "Harga Aktual 2026": [format_rupiah(v) for v in aktual_2026.values],
+    "Harga Prediksi 2026": [format_rupiah(v) for v in prediksi_2026.iloc[:7].values],
+    "Selisih (Rp/kg)": [format_rupiah(abs(v)) for v in selisih],
+    "Perbedaan (%)": [f"{abs(v):.2f}%".replace(".", ",") for v in persen_selisih],
+    "Keterangan": ["Prediksi lebih tinggi" if v > 0 else "Prediksi lebih rendah" if v < 0 else "Sama" for v in selisih]
 })
-st.dataframe(tabel_prediksi, use_container_width=True, hide_index=True)
-st.caption(
-    "Tabel menampilkan hasil prediksi harga per kilogram untuk Januari "
-    "sampai Juli 2026 berdasarkan model ARIMA(3,0,3)."
+st.dataframe(tabel, use_container_width=True, hide_index=True)
+
+st.markdown('<div class="section-title">📌 Kesimpulan Perbandingan</div>', unsafe_allow_html=True)
+rata_selisih = abs(persen_selisih).mean()
+st.success(
+    f"Berdasarkan perbandingan Januari-Juli 2026, rata-rata perbedaan absolut antara "
+    f"harga aktual dan hasil prediksi adalah **{rata_selisih:.2f}%**. "
+    "Perbedaan ini menunjukkan bahwa hasil prediksi model tidak selalu sama dengan "
+    "harga yang terjadi di pasar."
 )
 
-st.warning(
-    "Hasil prediksi merupakan perkiraan berdasarkan pola data historis "
-    "Januari 2021 sampai Desember 2025. Harga aktual dapat berbeda karena "
-    "perubahan kondisi pasar, pasokan, permintaan, musim, cuaca, dan faktor lainnya."
+st.markdown('<div class="section-title">📘 Cara Membaca Dashboard</div>', unsafe_allow_html=True)
+st.info(
+    "Grafik pertama menampilkan seluruh hasil prediksi harga tahun 2026. Grafik kedua "
+    "memperlihatkan perbandingan antara data aktual dan prediksi untuk Januari-Juli 2026. "
+    "Tabel digunakan untuk melihat nilai aktual, nilai prediksi, selisih, serta arah "
+    "perbedaannya pada setiap bulan."
 )
+
+st.markdown('<div class="section-title">⚠️ Catatan</div>', unsafe_allow_html=True)
+st.warning(
+    "Prediksi tahun 2026 merupakan hasil perkiraan berdasarkan pola data historis "
+    "Januari 2021 sampai Desember 2025. Perbandingan dengan data aktual hanya ditampilkan "
+    "untuk Januari-Juli 2026 karena data aktual yang tersedia pada penelitian ini baru "
+    "mencakup periode tersebut. Harga sebenarnya dapat berbeda karena kondisi pasar, "
+    "pasokan, permintaan, musim, cuaca, dan faktor lainnya."
+)
+
 st.divider()
 st.caption("Sumber data historis: PIHPS Nasional (hargapangan.id)")
 st.caption("Periode data historis: Januari 2021-Desember 2025")
 st.caption("Metode peramalan: ARIMA(3,0,3)")
 st.caption("Periode prediksi: Januari-Desember 2026")
+st.caption("Periode perbandingan aktual dan prediksi: Januari-Juli 2026")
